@@ -2,16 +2,11 @@
 #![no_main]
 #![allow(nonstandard_style, dead_code)]
 
-use aya_bpf::{
-    bindings::xdp_action,
-    macros::{map, xdp},
-    maps::PerfEventArray,
-    programs::XdpContext,
-};
+use aya_bpf::{bindings::xdp_action, macros::xdp, programs::XdpContext};
+use aya_log_ebpf::info;
 
 use core::mem;
 use memoffset::offset_of;
-use myapp_common::PacketLog;
 
 mod bindings;
 use bindings::{ethhdr, iphdr};
@@ -21,10 +16,6 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
 }
 
-#[map(name = "EVENTS")] // (1)
-static mut EVENTS: PerfEventArray<PacketLog> =
-    PerfEventArray::<PacketLog>::with_max_entries(1024, 0);
-
 #[xdp]
 pub fn xdp_firewall(ctx: XdpContext) -> u32 {
     match try_xdp_firewall(ctx) {
@@ -33,7 +24,7 @@ pub fn xdp_firewall(ctx: XdpContext) -> u32 {
     }
 }
 
-#[inline(always)] // (2)
+#[inline(always)] // (1)
 unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     let start = ctx.data();
     let end = ctx.data_end();
@@ -48,7 +39,7 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
 
 fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
     let h_proto = u16::from_be(unsafe {
-        *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? // (3)
+        *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? // (2)
     });
     if h_proto != ETH_P_IP {
         return Ok(xdp_action::XDP_PASS);
@@ -57,13 +48,7 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
         *ptr_at(&ctx, ETH_HDR_LEN + offset_of!(iphdr, saddr))?
     });
 
-    let log_entry = PacketLog {
-        ipv4_address: source,
-        action: xdp_action::XDP_PASS,
-    };
-    unsafe {
-        EVENTS.output(&ctx, &log_entry, 0); // (4)
-    }
+    info!(&ctx, "src: {:ipv4}", source);
     Ok(xdp_action::XDP_PASS)
 }
 

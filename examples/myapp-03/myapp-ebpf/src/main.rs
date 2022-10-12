@@ -5,13 +5,13 @@
 use aya_bpf::{
     bindings::xdp_action,
     macros::{map, xdp},
-    maps::{HashMap, PerfEventArray},
+    maps::HashMap,
     programs::XdpContext,
 };
+use aya_log_ebpf::info;
 
 use core::mem;
 use memoffset::offset_of;
-use myapp_common::PacketLog;
 
 mod bindings;
 use bindings::{ethhdr, iphdr};
@@ -21,12 +21,8 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
 }
 
-#[map(name = "EVENTS")]
-static mut EVENTS: PerfEventArray<PacketLog> =
-    PerfEventArray::<PacketLog>::with_max_entries(1024, 0);
-
 #[map(name = "BLOCKLIST")] // (1)
-static mut BLOCKLIST: HashMap<u32, u32> =
+static BLOCKLIST: HashMap<u32, u32> =
     HashMap::<u32, u32>::with_max_entries(1024, 0);
 
 #[xdp]
@@ -56,9 +52,8 @@ fn block_ip(address: u32) -> bool {
 }
 
 fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
-    let h_proto = u16::from_be(unsafe {
-        *ptr_at(&ctx, offset_of!(ethhdr, h_proto))?
-    });
+    let h_proto =
+        u16::from_be(unsafe { *ptr_at(&ctx, offset_of!(ethhdr, h_proto))? });
     if h_proto != ETH_P_IP {
         return Ok(xdp_action::XDP_PASS);
     }
@@ -68,18 +63,12 @@ fn try_xdp_firewall(ctx: XdpContext) -> Result<u32, ()> {
 
     // (3)
     let action = if block_ip(source) {
+        info!(&ctx, "src: {:ipv4}, action: drop", source);
         xdp_action::XDP_DROP
     } else {
+        info!(&ctx, "src: {:ipv4}, action: pass", source);
         xdp_action::XDP_PASS
     };
-
-    let log_entry = PacketLog {
-        ipv4_address: source,
-        action: action,
-    };
-    unsafe {
-        EVENTS.output(&ctx, &log_entry, 0);
-    }
     Ok(action)
 }
 
