@@ -17,6 +17,7 @@ use cgroup_skb_egress_common::PacketLog;
     non_snake_case,
     non_upper_case_globals,
     unnecessary_transmutes,
+    unsafe_op_in_unsafe_fn,
 )]
 #[rustfmt::skip]
 mod bindings;
