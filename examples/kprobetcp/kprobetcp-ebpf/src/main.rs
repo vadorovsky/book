@@ -4,6 +4,7 @@
 #[allow(
     clippy::all,
     dead_code,
+    improper_ctypes_definitions,
     non_camel_case_types,
     non_snake_case,
     non_upper_case_globals,
@@ -11,9 +12,9 @@
     unsafe_op_in_unsafe_fn,
 )]
 #[rustfmt::skip]
-mod binding;
+mod vmlinux;
 
-use crate::binding::{sock, sock_common};
+use crate::vmlinux::{sock, sock_common};
 
 use aya_ebpf::{
     helpers::bpf_probe_read_kernel, macros::kprobe, programs::ProbeContext,
