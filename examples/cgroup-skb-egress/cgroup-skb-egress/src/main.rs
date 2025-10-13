@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use aya::{
     maps::{
         HashMap,
-        perf::{AsyncPerfEventArray, Events},
+        perf::{Events, PerfEventArray},
     },
     programs::{CgroupAttachMode, CgroupSkb, CgroupSkbAttachType},
     util::online_cpus,
